@@ -1,6 +1,6 @@
 from django.http import HttpResponse, JsonResponse
 
-from models import items
+from .models import items
 from bson.objectid import ObjectId
 
 
