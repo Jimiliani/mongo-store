@@ -1,3 +1,13 @@
-from django.db import models
+from pymongo import MongoClient
 
-# Create your models here.
+client = MongoClient()
+
+mongo_shop = client['mongo_shop']
+
+items = mongo_shop['items']
+
+# item:
+# name
+# price
+# count
+# additional
