@@ -58,9 +58,10 @@ def buy_item(request, pk):
                 new_count = int(item.get("count", 0)) - 1
                 try:
                     new_additional = item.get("additional", {})
+                    new_additional['sales'] = int(new_additional.get('sales', 0)) + 1
                 except (AttributeError, json.decoder.JSONDecodeError) as e:
                     new_additional = {}
-                new_additional['sales'] = int(new_additional.get('sales', 0)) + 1
+                    new_additional['sales'] = int(new_additional.get('sales', 0)) + 1
 
                 items.update_one(
                     {
