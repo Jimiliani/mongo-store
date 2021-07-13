@@ -1,3 +1,5 @@
+import json
+
 from bson import json_util
 from django.http import HttpResponse
 
@@ -15,14 +17,26 @@ def get_item(request, pk):
         return HttpResponse(status=405)
 
 
+def get_filtration_dict(filtration):
+    if filtration == 'count':
+        return 'count', -1
+    elif filtration == 'sales':
+        return 'additional.sales', -1
+    return 'name', 1
+
+
 @csrf_exempt
 def get_multiple_items_or_create(request):
     if request.method == 'GET':
+        data = request.GET.copy()
+        filtration = data.pop('filtration', None)
+        if isinstance(filtration, list):
+            filtration = filtration[0]
+
         items_ = []
-        for item in items.find(request.GET):
+        for item in items.find(data).sort(*get_filtration_dict(filtration)):
             items_.append(item)
-        print(items_)
-        print(json_util.dumps(items_))
+
         return HttpResponse(json_util.dumps(items_), headers={'Content-Type': 'application/json'})
     elif request.method == 'POST':
         name = request.POST.get('name')
@@ -39,10 +53,27 @@ def get_multiple_items_or_create(request):
 def buy_item(request, pk):
     if request.method == 'POST':
         item = items.find_one({"_id": ObjectId(pk)})
-        print(item)
         if item:
             if int(item['count']) > 0:
-                items.update_one({"_id": ObjectId(item['_id'])}, {"$set": {"count": int(item["count"]) - 1}})
+                new_count = int(item.get("count", 0)) - 1
+                try:
+                    new_additional = item.get("additional", {})
+                except (AttributeError, json.decoder.JSONDecodeError) as e:
+                    new_additional = {}
+                new_additional['sales'] = int(new_additional.get('sales', 0)) + 1
+
+                items.update_one(
+                    {
+                        "_id": ObjectId(item['_id'])
+                    },
+                    {
+                        "$set":
+                            {
+                                "count": new_count,
+                                "additional": new_additional
+                            }
+                    }
+                )
                 return HttpResponse(status=200)
             else:
                 return HttpResponse("Too few items", status=400)
