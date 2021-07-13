@@ -1,38 +1,52 @@
-from django.http import HttpResponse, JsonResponse
+from bson import json_util
+from django.http import HttpResponse
+
+from bson.objectid import ObjectId
+from django.views.decorators.csrf import csrf_exempt
 
 from .models import items
-from bson.objectid import ObjectId
 
 
 def get_item(request, pk):
     if request.method == 'GET':
         item = items.find_one({"_id": ObjectId(pk)})
-        return JsonResponse(item)
+        return HttpResponse(json_util.dumps(item), headers={'Content-Type': 'application/json'})
     else:
         return HttpResponse(status=405)
 
 
+@csrf_exempt
 def get_multiple_items_or_create(request):
     if request.method == 'GET':
-        items_ = items.find(request.GET)
-        return JsonResponse(items_)
+        items_ = []
+        for item in items.find(request.GET):
+            items_.append(item)
+        print(items_)
+        print(json_util.dumps(items_))
+        return HttpResponse(json_util.dumps(items_), headers={'Content-Type': 'application/json'})
     elif request.method == 'POST':
-        items.insert_one(request.POST.get('item'))
-        return HttpResponse(status=201)
+        name = request.POST.get('name')
+        price = request.POST.get('price')
+        count = request.POST.get('count')
+        additional = request.POST.get('additional')
+        item = items.insert_one({'name': name, 'price': price, 'count': count, 'additional': additional})
+        return HttpResponse(item.inserted_id, status=201)
     else:
         return HttpResponse(status=405)
 
 
-def buy_item(request):
+@csrf_exempt
+def buy_item(request, pk):
     if request.method == 'POST':
-        item = items.find_one({"_id": request.POST.get('item')})
+        item = items.find_one({"_id": ObjectId(pk)})
+        print(item)
         if item:
-            if item['count'] > 0:
-                items.update_one({"_id": ObjectId(item['_id'])}, {"$set": {"count": item["count"] - 1}})
+            if int(item['count']) > 0:
+                items.update_one({"_id": ObjectId(item['_id'])}, {"$set": {"count": int(item["count"]) - 1}})
+                return HttpResponse(status=200)
             else:
                 return HttpResponse("Too few items", status=400)
         else:
             return HttpResponse(status=404)
-        return HttpResponse(status=200)
     else:
         return HttpResponse(status=405)
